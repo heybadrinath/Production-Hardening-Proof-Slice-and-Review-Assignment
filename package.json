@@ -2,6 +2,6 @@
   "name": "production-hardening-proof-slice-and-review-starter",
   "version": "1.0.0",
   "description": "Starter: a circuit-breaker production-hardening proof slice for PromptPilot.",
-  "scripts": { "test": "node --test" },
+  "scripts": { "test": "node --test", "demo": "node scripts/demo.js" },
   "license": "MIT"
 }

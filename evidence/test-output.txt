@@ -1,0 +1,19 @@
+✔ stays closed below the minimum request volume (0.683291ms)
+✔ opens once failures cross the threshold with enough volume (0.127292ms)
+✔ short-circuits without calling the dependency while open (0.237042ms)
+✔ probes after the open window and closes on a successful probe (0.10375ms)
+✔ a failed probe re-opens the circuit (0.1045ms)
+✔ reports state changes for observability (0.600917ms)
+✔ admits only one recovery probe while concurrent requests fail fast (1.014375ms)
+✔ late results from before an opening cannot contaminate the recovered window (0.696416ms)
+✔ a failed probe starts a fresh full cooldown (0.138667ms)
+✔ returns a model draft while the provider is healthy (0.67625ms)
+✔ degrades to a safe fallback once the circuit opens (0.204291ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 81.57925

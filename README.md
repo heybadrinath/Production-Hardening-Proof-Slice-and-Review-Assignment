@@ -1,57 +1,42 @@
-# Starter — Circuit Breaker Proof Slice (PromptPilot)
+# PromptPilot: circuit-breaker proof slice
 
-This is the starter repository for **Option B (provided scenario)** of the assignment.
+## 1. Risk addressed
 
-Repository: `https://github.com/kalviumcommunity/Production-Hardening-Proof-Slice-and-Review-Assignment` (public, owned by
-`kalviumcommunity`). Fork it, implement the breaker, and open a pull request back to your fork.
+PromptPilot depends on an external model to draft support replies. Repeated provider failures can waste capacity and delay every incoming ticket. This slice stops calling an unhealthy provider and returns the existing human-review fallback promptly.
 
-> The control here is a **circuit breaker**, covered earlier in this module. You are applying a
-> concept you have already learned, not a new one.
+## 2. Chosen control
 
-## Scenario
+A circuit breaker wraps the provider call in `src/circuitBreaker.js`. It starts CLOSED and tracks completed calls and failures. Once at least five calls have completed and the failure ratio reaches 0.5, it opens for 1,000 ms. These defaults are configurable. During that interval it rejects calls without invoking the provider. Afterward, exactly one HALF_OPEN probe is admitted; success resets the counting window and closes the breaker, while failure starts a new open interval. Late calls from an older window still update lifetime metrics but cannot change the new window.
 
-PromptPilot drafts support replies by calling an external model provider. When the provider is slow
-or failing, every request still tries it, so doomed calls pile up and the failure spreads. You will
-add a **circuit breaker** so sustained failures short-circuit fast to a safe fallback, then recover
-through a probe.
+## 3. How to run / test
 
-## Your task
+Use Node.js 18 or newer. There are no packages to install and no API keys are required.
 
-Implement the circuit breaker in [`src/circuitBreaker.js`](./src/circuitBreaker.js). The file has a
-skeleton and a `TODO`. The behaviour is fully specified by the supplied tests.
-
-Prerequisite: Node.js 18 or newer (the tests use Node's built-in test runner). Then run:
-
-```bash
+```sh
 node --test
+node scripts/demo.js
 ```
 
-Make **all tests pass**. Do **not** modify the tests. The reply path in `src/replyService.js` is
-already wired to your breaker.
+`npm test` and `npm run demo` are equivalent. The supplied tests are unchanged. Three additional tests exercise competing recovery probes, late in-flight failures, and the cooldown after a failed probe.
 
-The breaker must:
+## 4. Evidence
 
-- start `CLOSED` and count calls and failures;
-- move to `OPEN` when `failures / calls >= failureThreshold` **and** `calls >= minimumRequests`;
-- while `OPEN` and within `openMillis`, short-circuit (throw `CircuitOpenError` without calling the
-  dependency) and increment `metrics.short_circuited_total`;
-- after `openMillis` elapses (using the injected `now()`), allow one `HALF_OPEN` probe — success
-  closes it and resets counts, failure re-opens it;
-- increment `metrics.breaker_open_total` on every trip and call `onStateChange(state)` on every
-  transition.
+All 11 tests pass, including the eight supplied tests. The deterministic demo makes five failed provider calls, serves the sixth request from the fallback without another provider call, then allows one successful probe after advancing the injected clock. See [test output](evidence/test-output.txt) and [demo output](evidence/demo-output.txt).
 
-## What to submit
+The demo ends with provider call count 6 and metrics `breaker_open_total=1`, `short_circuited_total=1`, `success_total=1`, and `failure_total=5`. Its transition sequence is OPEN → HALF_OPEN → CLOSED. This demonstrates failure isolation and recovery without relying on a live outage.
 
-Open a pull request on a branch named `production-hardening-slice`, and in your README include these
-labelled sections:
+## 5. Observability note
 
-1. **Risk addressed**
-2. **Chosen control**
-3. **How to run / test**
-4. **Evidence** (a reviewer can confirm it works without reading all your code)
-5. **Observability note** (which metric moves and which state changes are logged)
-6. **Trade-off**
-7. **Remaining risk**
-8. **How this production control protects my Modules 1–3 design**
+Each opening increments `breaker_open_total`; every rejected request increments `short_circuited_total`. `success_total` and `failure_total` count actual provider outcomes across all windows. The `onStateChange` callback exposes each transition. The demo logs those transitions as `breaker_state_changed` JSON events, followed by a fallback event and a metrics snapshot. Production wiring should export the counters and attach a dependency identifier; it should not log ticket text, model prompts, credentials, or personal data.
 
-Submit the pull-request URL.
+## 6. Trade-off
+
+Opening the breaker deliberately withholds model drafts, even if the provider recovers before the cooldown ends. It protects capacity at the cost of temporary reduced functionality. The counting window lasts until recovery rather than using a rolling time window, so a long healthy history can delay opening; this is acceptable for the assignment's specified control but needs workload-based tuning in production.
+
+## 7. Remaining risk
+
+The breaker reacts to completed failures. A provider call that hangs still needs its own timeout and cancellation policy. State is local to one service instance, so each replica can issue a recovery probe. Rate limits, bounded retries, output validation, and durable human-review delivery remain separate controls. The existing fallback text says a ticket is queued, but this starter has no real queue or persistence; the demo proves the response path, not delivery to an agent.
+
+## 8. How this production control protects my Modules 1–3 design
+
+For the provided PromptPilot scenario, Module 1's support-response contract can remain available when drafting fails: the service returns a defined fallback instead of spreading a dependency failure. Module 2's ticket records remain the source of truth; the breaker adds no model-written state and no schema change. Module 3's model stays a bounded drafting component with an explicit fallback, rather than becoming a requirement for every response. Human review, permissions, and output checks still own any consequential action; this slice does not claim to implement those separate parts.

@@ -1,0 +1,6 @@
+{"event":"breaker_state_changed","state":"OPEN"}
+{"event":"safe_fallback","source":"fallback","text":"Your ticket is queued for a human agent.","reason":"circuit_open","providerCalls":5}
+{"event":"breaker_state_changed","state":"HALF_OPEN"}
+{"event":"breaker_state_changed","state":"CLOSED"}
+{"event":"recovered","state":"CLOSED","providerCalls":6}
+{"event":"breaker_metrics","breaker_open_total":1,"short_circuited_total":1,"success_total":1,"failure_total":5}
